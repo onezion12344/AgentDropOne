@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "onezion-agent-sync"
+version = "0.2.0"
+description = "Unified agent config migration tool — scan, export, import secrets & discover agent configs from GitHub docs"
+requires-python = ">=3.9"
+
+[project.scripts]
+onezion-agent-sync = "agentsync.cli:main"
