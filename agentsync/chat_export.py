@@ -220,14 +220,238 @@ def export_gemini(output_dir: Path) -> list[ChatSession]:
     return sessions
 
 
+def export_codex(output_dir: Path) -> list[ChatSession]:
+    """Export Codex CLI sessions."""
+    sessions = []
+    dest = output_dir / "codex"
+    dest.mkdir(parents=True, exist_ok=True)
+
+    sessions_dir = HOME / ".codex" / "sessions"
+    if not sessions_dir.exists():
+        return sessions
+
+    for jsonl_file in sorted(sessions_dir.rglob("*.jsonl")):
+        msg_count = 0
+        title = ""
+        try:
+            for line in jsonl_file.read_text(errors="ignore").splitlines():
+                try:
+                    d = json.loads(line)
+                    role = d.get("role", "")
+                    if role == "user":
+                        msg_count += 1
+                        if not title:
+                            content = d.get("content", "")
+                            if isinstance(content, str):
+                                title = content[:80]
+                            elif isinstance(content, list):
+                                for item in content:
+                                    if isinstance(item, dict) and item.get("type") == "text":
+                                        title = item.get("text", "")[:80]
+                                        break
+                except:
+                    pass
+        except:
+            pass
+
+        dest_file = dest / jsonl_file.name
+        shutil.copy2(jsonl_file, dest_file)
+        sessions.append(ChatSession(
+            agent="codex",
+            session_id=jsonl_file.stem,
+            title=title,
+            message_count=msg_count,
+            file_path=str(dest_file),
+            size_bytes=jsonl_file.stat().st_size,
+        ))
+
+    return sessions
+
+
+def export_codexia(output_dir: Path) -> list[ChatSession]:
+    """Export Codexia sessions."""
+    sessions = []
+    dest = output_dir / "codexia"
+    dest.mkdir(parents=True, exist_ok=True)
+
+    # JSONL sessions
+    codexia_dir = HOME / ".codexia"
+    if codexia_dir.exists():
+        for jsonl in codexia_dir.rglob("*.jsonl"):
+            shutil.copy2(jsonl, dest / jsonl.name)
+            sessions.append(ChatSession(agent="codexia", session_id=jsonl.stem))
+
+    # SQLite history
+    history_db = HOME / ".codexia" / "cache.db"
+    if history_db.exists():
+        shutil.copy2(history_db, dest / "cache.db")
+
+    return sessions
+
+
+def export_claude_desktop_3p(output_dir: Path) -> list[ChatSession]:
+    """Export Claude Desktop 3p conversations."""
+    sessions = []
+    dest = output_dir / "claude-desktop-3p"
+    dest.mkdir(parents=True, exist_ok=True)
+
+    base = Path.home() / "Library/Application Support/Claude-3p"
+    if not base.exists():
+        return sessions
+
+    # JSONL files
+    for jsonl in base.rglob("*.jsonl"):
+        msg_count = 0
+        title = ""
+        try:
+            for line in jsonl.read_text(errors="ignore").splitlines():
+                try:
+                    d = json.loads(line)
+                    if d.get("role") == "user" or d.get("type") == "user":
+                        msg_count += 1
+                        if not title:
+                            c = d.get("content", d.get("message", ""))
+                            if isinstance(c, str):
+                                title = c[:80]
+                            elif isinstance(c, dict):
+                                title = str(c.get("content", ""))[:80]
+                except:
+                    pass
+        except:
+            pass
+
+        dest_file = dest / jsonl.name
+        shutil.copy2(jsonl, dest_file)
+        sessions.append(ChatSession(
+            agent="claude-desktop-3p",
+            session_id=jsonl.stem,
+            title=title,
+            message_count=msg_count,
+            size_bytes=jsonl.stat().st_size,
+        ))
+
+    return sessions
+
+
+def export_autoclaw(output_dir: Path) -> list[ChatSession]:
+    """Export AutoClaw sessions from SQLite."""
+    sessions = []
+    dest = output_dir / "autoclaw"
+    dest.mkdir(parents=True, exist_ok=True)
+
+    base = Path.home() / "Library/Application Support/autoclaw"
+    for db_file in base.rglob("*.db"):
+        if db_file.stat().st_size > 1024:  # Skip tiny dbs
+            shutil.copy2(db_file, dest / db_file.name)
+            sessions.append(ChatSession(
+                agent="autoclaw",
+                session_id=db_file.name,
+                size_bytes=db_file.stat().st_size,
+            ))
+
+    return sessions
+
+
+def export_atlas(output_dir: Path) -> list[ChatSession]:
+    """Export ChatGPT Atlas sessions from SQLite."""
+    sessions = []
+    dest = output_dir / "chatgpt-atlas"
+    dest.mkdir(parents=True, exist_ok=True)
+
+    base = Path.home() / "Library/Application Support/com.openai.atlas"
+    for db_file in base.rglob("*.db"):
+        if db_file.stat().st_size > 1024:
+            shutil.copy2(db_file, dest / db_file.name)
+            sessions.append(ChatSession(
+                agent="chatgpt-atlas",
+                session_id=db_file.name,
+                size_bytes=db_file.stat().st_size,
+            ))
+
+    return sessions
+
+
+def export_cherrystudio(output_dir: Path) -> list[ChatSession]:
+    """Export CherryStudio sessions."""
+    sessions = []
+    dest = output_dir / "cherrystudio"
+    dest.mkdir(parents=True, exist_ok=True)
+
+    base = Path.home() / "Library/Application Support/CherryStudio"
+    for jsonl in base.rglob("*.jsonl"):
+        shutil.copy2(jsonl, dest / jsonl.name)
+        sessions.append(ChatSession(agent="cherrystudio", session_id=jsonl.stem))
+
+    for db_file in base.rglob("*.db"):
+        if db_file.stat().st_size > 1024:
+            shutil.copy2(db_file, dest / db_file.name)
+
+    return sessions
+
+
+def export_anythingllm(output_dir: Path) -> list[ChatSession]:
+    """Export AnythingLLM sessions from SQLite."""
+    sessions = []
+    dest = output_dir / "anythingllm"
+    dest.mkdir(parents=True, exist_ok=True)
+
+    base = Path.home() / "Library/Application Support/anythingllm-desktop"
+    for db_file in base.rglob("*.db"):
+        if db_file.stat().st_size > 1024:
+            # Only copy if not too large (> 8GB might be vector DB)
+            if db_file.stat().st_size < 500 * 1024 * 1024:  # < 500MB
+                shutil.copy2(db_file, dest / db_file.name)
+                sessions.append(ChatSession(
+                    agent="anythingllm",
+                    session_id=db_file.name,
+                    size_bytes=db_file.stat().st_size,
+                ))
+            else:
+                sessions.append(ChatSession(
+                    agent="anythingllm",
+                    session_id=db_file.name,
+                    title=f"[SKIPPED - too large: {db_file.stat().st_size / 1024 / 1024:.0f}MB]",
+                ))
+
+    return sessions
+
+
+def export_mavis(output_dir: Path) -> list[ChatSession]:
+    """Export Mavis sessions from SQLite."""
+    sessions = []
+    dest = output_dir / "mavis"
+    dest.mkdir(parents=True, exist_ok=True)
+
+    base = HOME / ".mavis"
+    for db_file in base.rglob("*.db"):
+        if db_file.stat().st_size > 1024:
+            if db_file.stat().st_size < 500 * 1024 * 1024:
+                shutil.copy2(db_file, dest / db_file.name)
+                sessions.append(ChatSession(
+                    agent="mavis",
+                    session_id=db_file.name,
+                    size_bytes=db_file.stat().st_size,
+                ))
+
+    return sessions
+
+
 # ── Main export function ───────────────────────────────────
 
 EXPORTERS = {
     "claude-code": export_claude_code,
+    "claude-desktop-3p": export_claude_desktop_3p,
     "hermes": export_hermes,
     "workbuddy": export_workbuddy,
     "openclaw": export_openclaw,
     "gemini": export_gemini,
+    "codex": export_codex,
+    "codexia": export_codexia,
+    "autoclaw": export_autoclaw,
+    "chatgpt-atlas": export_atlas,
+    "cherrystudio": export_cherrystudio,
+    "anythingllm": export_anythingllm,
+    "mavis": export_mavis,
 }
 
 
