@@ -202,7 +202,7 @@ def cmd_discover():
 
 
 def cmd_orchestrate(output_dir):
-    from .orchestrator import export_all, generate_manual_guide
+    from .orchestrator import export_all, generate_manual_guide, discover_installed_agents
     from .secrets import discover_all, export_manifest
     from pathlib import Path
     import json

@@ -15,7 +15,8 @@ from .registry import KNOWN_AGENTS, AgentInfo, AgentAPI
 @dataclass
 class AgentStatus:
     """Discovery result for one agent."""
-    name: str
+    key: str  # registry key (e.g. "hermes")
+    name: str  # display name (e.g. "Hermes Agent")
     installed: bool
     api_type: str  # "mcp", "cli", "http", "websocket", "none"
     has_export: bool  # can we call it to export?
@@ -46,13 +47,13 @@ def discover_installed_agents() -> list[AgentStatus]:
     results = []
 
     for name, agent in KNOWN_AGENTS.items():
-        status = _check_agent(agent)
+        status = _check_agent(agent, name)
         results.append(status)
 
     return results
 
 
-def _check_agent(agent: AgentInfo) -> AgentStatus:
+def _check_agent(agent: AgentInfo, key: str = "") -> AgentStatus:
     """Check if an agent is installed and what API it exposes."""
     installed = False
 
@@ -79,6 +80,7 @@ def _check_agent(agent: AgentInfo) -> AgentStatus:
     has_export = bool(agent.api.export_command)
 
     return AgentStatus(
+        key=key,
         name=agent.name,
         installed=installed,
         api_type=agent.api.type,
@@ -93,12 +95,23 @@ def _check_agent(agent: AgentInfo) -> AgentStatus:
 def export_from_agent(agent_name: str, output_dir: Path) -> AgentStatus:
     """Call an agent to export its data.
 
+    Args:
+        agent_name: Registry key (e.g. "hermes") or display name (e.g. "Hermes Agent")
+
     Returns AgentStatus with exported=True/False and details.
     """
+    # Try direct key lookup first, then search by display name
     agent = KNOWN_AGENTS.get(agent_name)
+    key = agent_name
+    if not agent:
+        for k, a in KNOWN_AGENTS.items():
+            if a.name == agent_name:
+                agent = a
+                key = k
+                break
     if not agent:
         return AgentStatus(
-            name=agent_name, installed=False, api_type="none",
+            key=agent_name, name=agent_name, installed=False, api_type="none",
             has_export=False, export_command="", manual_hint="Unknown agent",
             error=f"Unknown agent: {agent_name}",
         )
@@ -113,7 +126,7 @@ def export_from_agent(agent_name: str, output_dir: Path) -> AgentStatus:
         return status
 
     # Build export command
-    export_dir = output_dir / agent_name
+    export_dir = output_dir / key
     export_dir.mkdir(parents=True, exist_ok=True)
     export_file = export_dir / "backup.zip"
 
@@ -155,7 +168,7 @@ def export_all(output_dir: Path) -> DiscoveryReport:
         if status.has_export:
             report.agents_with_api.append(asdict(status))
             # Try to export
-            result = export_from_agent(status.name, output_dir)
+            result = export_from_agent(status.key, output_dir)
             if result.exported:
                 status.exported = True
                 status.export_path = result.export_path
