@@ -451,6 +451,103 @@ class MiniAgent:
 
 # ── CLI ────────────────────────────────────────────────────
 
+def _extract_api_key(bundle_path: str) -> Optional[str]:
+    """Extract the best available API key from the migration bundle."""
+    staging = Path("/tmp/onezion-setup")
+    secrets_file = staging / "secrets-export.json"
+    if not secrets_file.exists():
+        return None
+
+    try:
+        data = json.loads(secrets_file.read_text())
+        secrets = data.get("secrets", [])
+    except:
+        return None
+
+    # Priority order: OpenRouter (universal) > DeepSeek > Anthropic > any
+    priority = ["OPENROUTER_API_KEY", "DEEPSEEK_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY"]
+    for preferred in priority:
+        for s in secrets:
+            if s["name"] == preferred and s.get("value") and len(s["value"]) > 10:
+                return s["value"]
+
+    # Fallback: first key that looks real
+    for s in secrets:
+        if s.get("value") and len(s["value"]) > 10 and not s["value"].startswith("***"):
+            return s["value"]
+
+    return None
+
+
+def _start_nanobot(api_key: str, bundle_path: str, dry_run: bool):
+    """Boot Nanobot as the bootstrap agent."""
+    print()
+    print("=" * 60)
+    print("  NANOBOT BOOTSTRAP MODE")
+    print("=" * 60)
+    print()
+
+    # Set API key as environment variable
+    os.environ["OPENROUTER_API_KEY"] = api_key
+    os.environ["OPENAI_API_KEY"] = api_key
+    print(f"  API key loaded from bundle (OpenRouter)")
+
+    # Build the prompt for Nanobot
+    bundle_abs = str(Path(bundle_path).resolve())
+    prompt = f"""You are AgentDropOne's bootstrap agent. A migration bundle has been extracted to /tmp/onezion-setup/.
+
+Your job:
+1. Read /tmp/onezion-setup/meta.json to understand what's in the bundle
+2. Read /tmp/onezion-setup/workspace-manifest.json and install all listed tools (brew, npm, pip)
+3. Read /tmp/onezion-setup/secrets-export.json and restore all secrets
+4. Restore agent configs from /tmp/onezion-setup/agent-sync/
+5. Restore cookies from /tmp/onezion-setup/cookie-migration.zip
+6. Verify everything works
+
+The original bundle is at: {bundle_abs}
+
+Start by reading meta.json and reporting what you find. Then proceed step by step.
+Ask the user before making any destructive changes.
+"""
+
+    if dry_run:
+        print(f"\n  [dry-run] Would start Nanobot with prompt:")
+        print(f"  {prompt[:200]}...")
+        return
+
+    # Try to start Nanobot
+    nanobot_path = Path(__file__).parent.parent.parent / "lib" / "nanobot"
+    if not nanobot_path.exists():
+        # Fallback: try pip-installed nanobot
+        nanobot_path = None
+
+    print(f"\n  Starting Nanobot bootstrap agent...")
+    print(f"  It will read the bundle and guide you through setup.\n")
+
+    try:
+        if nanobot_path and (nanobot_path / "__main__.py").exists():
+            # Use embedded Nanobot
+            subprocess.run(
+                [sys.executable, "-m", "nanobot", "chat", "--prompt", prompt],
+                cwd=str(nanobot_path.parent),
+                timeout=600,
+            )
+        else:
+            # Use system-installed Nanobot
+            subprocess.run(
+                ["nanobot", "chat", "--prompt", prompt],
+                timeout=600,
+            )
+    except FileNotFoundError:
+        print("  Nanobot not found. Installing...")
+        subprocess.run([sys.executable, "-m", "pip", "install", "nanobot-ai"], timeout=120)
+        subprocess.run(["nanobot", "chat", "--prompt", prompt], timeout=600)
+    except subprocess.TimeoutExpired:
+        print("  Nanobot session timed out (10min).")
+    except KeyboardInterrupt:
+        print("\n  Nanobot session ended.")
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(
@@ -459,10 +556,57 @@ def main():
     )
     parser.add_argument("bundle", help="Path to full-migration.zip")
     parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
+    parser.add_argument("--agent", action="store_true", help="Skip prompt, go straight to Nanobot")
+    parser.add_argument("--no-agent", action="store_true", help="Skip prompt, go straight to deterministic mode")
     args = parser.parse_args()
 
-    agent = MiniAgent(args.bundle, dry_run=args.dry_run)
-    agent.run()
+    # Extract bundle first (needed for both modes)
+    bundle = Path(args.bundle)
+    if not bundle.exists():
+        print(f"File not found: {bundle}")
+        return
+
+    staging = Path("/tmp/onezion-setup")
+    if staging.exists():
+        shutil.rmtree(staging)
+    staging.mkdir(parents=True)
+    with zipfile.ZipFile(bundle, 'r') as zf:
+        zf.extractall(staging)
+    print(f"Bundle extracted to {staging}")
+
+    # Ask: Nanobot or deterministic?
+    use_nanobot = False
+
+    if args.agent:
+        use_nanobot = True
+    elif args.no_agent:
+        use_nanobot = False
+    else:
+        print()
+        print("  Would you like to start Nanobot as your bootstrap agent?")
+        print("  Nanobot is a lightweight AI agent (HKUDS, 42KB) that can")
+        print("  intelligently guide you through the setup process.")
+        print()
+        print("    y = Start Nanobot (needs one API key from bundle)")
+        print("    n = Deterministic mode (no AI, just run the steps)")
+        print()
+        try:
+            answer = input("  Start Nanobot? [y/N] ").strip().lower()
+            use_nanobot = answer in ('y', 'yes')
+        except (EOFError, KeyboardInterrupt):
+            use_nanobot = False
+
+    if use_nanobot:
+        api_key = _extract_api_key(str(bundle))
+        if api_key:
+            _start_nanobot(api_key, str(bundle), args.dry_run)
+        else:
+            print("\n  No API key found in bundle. Falling back to deterministic mode.")
+            use_nanobot = False
+
+    if not use_nanobot:
+        agent = MiniAgent(str(bundle), dry_run=args.dry_run)
+        agent.run()
 
 
 if __name__ == "__main__":
