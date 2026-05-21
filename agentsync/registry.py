@@ -151,6 +151,18 @@ KNOWN_AGENTS: dict[str, AgentInfo] = {
         ),
         manual_export_hint="Export Casdoor config from admin UI: http://localhost:8000",
     ),
+    "cc-switch": AgentInfo(
+        name="CC Switch",
+        github="farion1231/cc-switch",
+        config_paths=[".cc-switch/settings.json"],
+        config_format="json",
+        api=AgentAPI(
+            type="cli",
+            cli_command="cc-switch",
+            check_command="test -d ~/.cc-switch",
+        ),
+        manual_export_hint="Copy ~/.cc-switch/ directory (settings.json + cc-switch.db + skills/)",
+    ),
 }
 
 
