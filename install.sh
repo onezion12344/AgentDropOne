@@ -371,22 +371,45 @@ main() {
     if [ -n "$BUNDLE" ]; then
         run_bundle "$BUNDLE"
     else
-        info "No bundle provided. AgentDropOne is ready for future use."
+        # No bundle — this is probably the OLD machine. Auto-export.
         echo ""
-        echo "  Next steps:"
-        echo "    1. Export on old machine:   cd ~/.agentdropone && python3 -m agentsync.cli chat-export"
-        echo "    2. Transfer bundle to this machine"
-        echo "    3. Run:  python3 ~/.agentdropone/onesync-skills/full-migrate/agentdropone-setup.py bundle.zip"
+        info "No bundle provided. Let's create one!"
         echo ""
-        echo "  Or with a bundle directly:"
-        echo "    install.sh /path/to/full-migration.zip"
+        echo "  This will scan your machine and export everything:"
+        echo "  - All API keys and secrets"
+        echo "  - All agent configs (Claude Code, Hermes, OpenClaw...)"
+        echo "  - All conversation history"
+        echo "  - Browser cookies and login states"
         echo ""
-        echo "  Quick commands:"
-        echo "    agentdropone-scan       — Discover all secrets"
-        echo "    agentdropone-export     — Export secrets to JSON"
-        echo "    agentdropone-chat       — Export all chat history"
-        echo "    agentdropone-discover   — Scan for installed agents"
-        echo ""
+
+        read -r -p "  Create migration bundle now? [Y/n] " answer
+        answer="${answer:-y}"
+
+        if [[ "$answer" =~ ^[Yy] ]]; then
+            BUNDLE_PATH="$HOME/Desktop/agentdropone-bundle.zip"
+            echo ""
+            info "Creating bundle at $BUNDLE_PATH..."
+            cd "$INSTALL_DIR"
+            python3 onesync-skills/full-migrate/agentdropone-setup.py "$BUNDLE_PATH" --export 2>/dev/null || {
+                # If --export not supported, run orchestrator
+                python3 -m agentsync.cli orchestrate -o /tmp/agentdropone-export
+                cd /tmp && zip -r "$BUNDLE_PATH" agentdropone-export/ >/dev/null 2>&1
+            }
+            echo ""
+            ok "Bundle created: $BUNDLE_PATH"
+            echo ""
+            echo "  Transfer this file to your new machine, then run:"
+            echo "    install.sh $BUNDLE_PATH"
+            echo ""
+            echo "  Or send it to yourself (OneDrive, AirDrop, email, USB...)"
+        else
+            echo ""
+            echo "  Manual export later:"
+            echo "    cd ~/.agentdropone"
+            echo "    python3 -m agentsync.cli export-secrets -o secrets.json"
+            echo "    python3 -m agentsync.cli chat-export -o ~/Desktop/chats"
+            echo "    python3 -m agentsync.cli discover"
+        fi
     fi
 }
 
