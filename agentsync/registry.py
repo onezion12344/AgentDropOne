@@ -161,7 +161,21 @@ KNOWN_AGENTS: dict[str, AgentInfo] = {
             cli_command="cc-switch",
             check_command="test -d ~/.cc-switch",
         ),
-        manual_export_hint="Copy ~/.cc-switch/ directory (settings.json + cc-switch.db + skills/)",
+        manual_export_hint="macOS: install from GitHub Releases (GUI tray app). Configs at ~/.cc-switch/",
+        notes="macOS GUI app. Linux: use cc-switch-cli instead.",
+    ),
+    "cc-switch-cli": AgentInfo(
+        name="CC Switch CLI",
+        github="SaladDay/cc-switch-cli",
+        config_paths=[".config/cc-switch/config.json"],
+        config_format="json",
+        api=AgentAPI(
+            type="cli",
+            cli_command="cc-switch-cli",
+            check_command="which cc-switch-cli",
+        ),
+        manual_export_hint="Linux: cargo install --git https://github.com/SaladDay/cc-switch-cli",
+        notes="Rust CLI for Linux. Supports WebDAV sync for cross-machine config sharing.",
     ),
 }
 
