@@ -37,34 +37,33 @@ Made with love by Harry OneZion
 
 ---
 
-## Usage
-
-### New machine (restore)
+## Install Flow
 
 ```bash
-curl -sSL https://.../install.sh | bash -s -- bundle.zip
+curl .../install.sh | bash
+
+  Do you have a migration bundle?
+    1) Yes — restore on this machine
+    2) No  — export this machine
+    3) Just install the tool
+
+  Choose [1/2/3]
 ```
 
-Auto-detects OS → installs Python/Node/Git → extracts bundle → asks:
+**Option 1**: Provide bundle → "Start Nanobot? [Y/n]" → 9-step restore
+**Option 2**: Auto-exports everything to `Desktop/agentdropone-bundle.zip`
+**Option 3**: Just installs. Run `agentdropone` anytime later.
 
-> *Would you like to start Nanobot as your bootstrap agent?* [y/N]
-
-- **y** = Nanobot reads bundle, intelligently guides setup (auto-grabs API key)
-- **n** = 9-step deterministic pipeline (no AI needed)
-
-### Old machine (export)
+### After install
 
 ```bash
-curl -sSL https://.../install.sh | bash
-# → No bundle? Let's create one!
-# → Scans all agents, exports 24 secrets, copies configs
-# → Saves to Desktop/agentdropone-bundle.zip
-```
-
-### Windows
-
-```powershell
-irm https://raw.githubusercontent.com/onezion12344/AgentDropOne/main/install.ps1 | iex
+agentdropone scan          # Discover all secrets
+agentdropone export        # Create bundle from this machine
+agentdropone chats         # Export chat history from 13 agents
+agentdropone discover      # Scan installed agents
+agentdropone sync          # Manual skill sync
+agentdropone sync-on       # Install hourly auto-sync
+agentdropone update        # Check & update to latest version
 ```
 
 ---
@@ -78,7 +77,6 @@ agentdropone-bundle.zip (~224 MB)
 ├── hermes/backup.zip           Auto-exported via CLI
 ├── openclaw/backup.zip         Auto-exported via CLI
 ├── claude-code/                Full configs + 190 skills + memory
-├── gemini-cli/                 Firebase configs
 ├── chat-history/               913 sessions from 13 agents
 ├── cookie-migration.zip        gh, fly, superhuman, rclone, Chrome
 └── meta.json
@@ -92,26 +90,7 @@ Runs automatically every hour:
 ```
 Claude Code ←→ WorkBuddy ←→ Hermes ←→ OneDrive
 ```
-
 First run: **364 skills synced, 0 conflicts**.
-
-```bash
-python3 -m agentsync.skill_sync              # Manual run
-python3 -m agentsync.skill_sync --install-launchd  # Install hourly
-```
-
----
-
-## CLI Reference
-
-| Command | Does |
-|---------|------|
-| `install.sh` | One-click full install |
-| `python3 -m agentsync.cli scan` | Discover all secrets |
-| `python3 -m agentsync.cli chat-export` | Export 913 sessions from 13 agents |
-| `python3 -m agentsync.cli discover` | Scan installed agents |
-| `python3 -m agentsync.cli orchestrate` | Auto-export all agents |
-| `python3 -m agentsync.cli docs --all` | Discover agent configs from GitHub |
 
 ---
 
