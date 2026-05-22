@@ -54,9 +54,9 @@ else
     echo "    2) No  — Export this machine (create a new bundle)"
     echo "    3) Just install the tool (I'll use it later)"
     echo ""
-    read -r -p "  Choose [1/2/3] " answer
+    read -r -p "  Choose [1/2/3] " answer < /dev/tty
     case "$answer" in
-        1) read -r -p "  Path to bundle: " path; [ -f "$path" ] && BUNDLE_PATH="$path" || { err "Not found"; exit 1; } ;;
+        1) read -r -p "  Path to bundle: " path < /dev/tty; [ -f "$path" ] && BUNDLE_PATH="$path" || { err "Not found"; exit 1; } ;;
         2) ;;  # Will export after install
         3) ;;  # Just install
     esac
@@ -127,7 +127,7 @@ if [ -n "$BUNDLE_PATH" ]; then
     echo "    y = AI-guided (auto-grabs API key from bundle)"
     echo "    n = Deterministic 9-step pipeline"
     echo ""
-    read -r -p "  Start Nanobot? [Y/n] " use_ai
+    read -r -p "  Start Nanobot? [Y/n] " use_ai < /dev/tty
     use_ai="${use_ai:-y}"
 
     if [[ "$use_ai" =~ ^[Yy] ]]; then
